@@ -23,7 +23,7 @@
     "repositories": [
         {
             "type": "vcs",
-            "url": "git@github.com:qofclubs/dictionary"
+            "url": "git@github.com:mattimatti/dictionary"
         }
     ],
     "require": {

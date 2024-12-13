@@ -18,7 +18,7 @@ class SimpleLambda extends Lambda
 {
     public function __construct(Node $node, $lineNumber)
     {
-        parent::__construct([$node], [], $lineNumber);
+        parent::__construct(['node' => $node], [], $lineNumber);
     }
 
     public function compile(Compiler $compiler)

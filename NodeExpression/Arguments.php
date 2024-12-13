@@ -17,7 +17,7 @@ use Twig\Node\Node;
 
 class Arguments extends AbstractExpression
 {
-    private array $arguments;
+    private readonly array $arguments;
 
     public function __construct(Node $left, Node $right, $lineno)
     {

@@ -11,6 +11,9 @@
 namespace DPolac\TwigLambda;
 
 use DPolac\Dictionary;
+use DPolac\TwigLambda\NodeExpression\Arguments;
+use DPolac\TwigLambda\NodeExpression\LambdaWithArguments;
+use DPolac\TwigLambda\NodeExpression\SimpleLambda;
 use Twig\Error\RuntimeError;
 use Twig\ExpressionParser;
 use Twig\Extension\AbstractExtension;
@@ -21,27 +24,53 @@ use Twig\TwigTest;
 class LambdaExtension extends AbstractExtension
 {
 
+//    public function getOperators(): array
+//    {
+//        return [
+//            [
+//                '=>' => [
+//                    'precedence' => 0,
+//                    'class' => '\DPolac\TwigLambda\NodeExpression\SimpleLambda'
+//                ],
+//            ],
+//            [
+//                '=>' => [
+//                    'precedence' => 0,
+//                    'class' => '\DPolac\TwigLambda\NodeExpression\LambdaWithArguments',
+//                    'associativity' => ExpressionParser::OPERATOR_LEFT
+//                ],
+//                ';' => [
+//                    'precedence' => 5,
+//                    'class' => '\DPolac\TwigLambda\NodeExpression\Arguments',
+//                    'associativity' => ExpressionParser::OPERATOR_RIGHT
+//                ],
+//            ]
+//        ];
+//    }
+
+
+
     public function getOperators(): array
     {
         return [
             [
-                '=>' => [
+                '==>' => [
                     'precedence' => 0,
-                    'class' => '\DPolac\TwigLambda\NodeExpression\SimpleLambda'
+                    'class' => SimpleLambda::class,
                 ],
             ],
             [
-                '=>' => [
+                '==>' => [
                     'precedence' => 0,
-                    'class' => '\DPolac\TwigLambda\NodeExpression\LambdaWithArguments',
-                    'associativity' => ExpressionParser::OPERATOR_LEFT
+                    'class' => LambdaWithArguments::class,
+                    'associativity' => ExpressionParser::OPERATOR_LEFT,
                 ],
                 ';' => [
                     'precedence' => 5,
-                    'class' => '\DPolac\TwigLambda\NodeExpression\Arguments',
-                    'associativity' => ExpressionParser::OPERATOR_RIGHT
+                    'class' => Arguments::class,
+                    'associativity' => ExpressionParser::OPERATOR_RIGHT,
                 ],
-            ]
+            ],
         ];
     }
 

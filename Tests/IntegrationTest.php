@@ -9,13 +9,11 @@ class IntegrationTest extends \Twig_Test_IntegrationTestCase
 
     public function getExtensions()
     {
-        return array(
-            new LambdaExtension(),
-        );
+        return [new LambdaExtension()];
     }
 
     public function getFixturesDir()
     {
-        return dirname(__FILE__).'/Fixtures/';
+        return __DIR__.'/Fixtures/';
     }
 }

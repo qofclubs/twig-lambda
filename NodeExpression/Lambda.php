@@ -11,11 +11,16 @@
 namespace DPolac\TwigLambda\NodeExpression;
 
 
-abstract class Lambda extends \Twig_Node_Expression
+use Twig\Compiler;
+use Twig\Node\Expression\AbstractExpression;
+
+abstract class Lambda extends AbstractExpression
 {
     protected function compileWithArguments(
-        \Twig_Compiler $compiler, $expressionNode, array $arguments)
-    {
+        Compiler $compiler,
+        $expressionNode,
+        array $arguments
+    ): void {
         $compiler->raw("\n");
         $compiler->indent();
         $compiler->write('');

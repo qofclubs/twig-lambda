@@ -11,29 +11,31 @@
 namespace DPolac\TwigLambda\NodeExpression;
 
 
+use Twig\Compiler;
+use Twig\Node\Expression\NameExpression;
+use Twig\Node\Node;
+
 class LambdaWithArguments extends Lambda
 {
     private $arguments = [];
 
-    public function __construct(\Twig_Node $left, \Twig_Node $right, $lineno)
+    public function __construct(Node $left, Node $right, $lineno)
     {
-        parent::__construct(array('left' => $left, 'right' => $right), array(), $lineno);
-
-        if ($left instanceof \Twig_Node_Expression_Name) {
+        if ($left instanceof NameExpression) {
             $this->arguments = [ $left->getAttribute('name') ];
         } elseif ($left instanceof Arguments) {
             $this->arguments = $left->getArguments();
         } else {
             throw new \InvalidArgumentException('Invalid argument\'s list for lambda.');
         }
-        
+
         if (count($this->arguments) !== count(array_flip($this->arguments))) {
             throw new \InvalidArgumentException('Each lambda argument must have unique name.');
         }
 
     }
 
-    public function compile(\Twig_Compiler $compiler)
+    public function compile(Compiler $compiler)
     {
         $this->compileWithArguments($compiler, 'right', $this->arguments);
     }

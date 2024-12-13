@@ -19,10 +19,10 @@ class LambdaWithArguments extends Lambda
 {
     private $arguments = [];
 
-    public function __construct(Node $left, Node $right, $lineno)
+    public function __construct(Node $left, Node $right, $lineNumber)
     {
         if ($left instanceof NameExpression) {
-            $this->arguments = [ $left->getAttribute('name') ];
+            $this->arguments = [$left->getAttribute('name')];
         } elseif ($left instanceof Arguments) {
             $this->arguments = $left->getArguments();
         } else {
@@ -33,6 +33,7 @@ class LambdaWithArguments extends Lambda
             throw new \InvalidArgumentException('Each lambda argument must have unique name.');
         }
 
+        parent::__construct(['left' => $left, 'right' => $right], [], $lineNumber);
     }
 
     public function compile(Compiler $compiler)

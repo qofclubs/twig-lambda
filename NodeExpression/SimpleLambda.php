@@ -16,8 +16,9 @@ use Twig\Node\Node;
 
 class SimpleLambda extends Lambda
 {
-    public function __construct(Node $node, $lineno)
+    public function __construct(Node $node, $lineNumber)
     {
+        parent::__construct([$node], [], $lineNumber);
     }
 
     public function compile(Compiler $compiler)

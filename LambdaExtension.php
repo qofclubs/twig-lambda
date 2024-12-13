@@ -24,53 +24,338 @@ use Twig\TwigTest;
 class LambdaExtension extends AbstractExtension
 {
 
-//    public function getOperators(): array
-//    {
-//        return [
-//            [
-//                '=>' => [
-//                    'precedence' => 0,
-//                    'class' => '\DPolac\TwigLambda\NodeExpression\SimpleLambda'
-//                ],
-//            ],
-//            [
-//                '=>' => [
-//                    'precedence' => 0,
-//                    'class' => '\DPolac\TwigLambda\NodeExpression\LambdaWithArguments',
-//                    'associativity' => ExpressionParser::OPERATOR_LEFT
-//                ],
-//                ';' => [
-//                    'precedence' => 5,
-//                    'class' => '\DPolac\TwigLambda\NodeExpression\Arguments',
-//                    'associativity' => ExpressionParser::OPERATOR_RIGHT
-//                ],
-//            ]
-//        ];
-//    }
+    /**
+     * @throws \Twig\Error\RuntimeError
+     */
+    public static function filter($array, $callback)
+    {
+        if (!is_callable($callback)) {
+            throw new RuntimeError(
+                sprintf(
+                    'Second argument of "filter" must be callable, but is "%s".',
+                    gettype($callback)
+                )
+            );
+        }
 
+        if (is_array($array)) {
+            $array = array_filter($array, $callback, ARRAY_FILTER_USE_BOTH);
+        } elseif ($array instanceof \Traversable) {
+            $result = new Dictionary();
+            foreach ($array as $i => $item) {
+                if ($callback($item, $i)) {
+                    $result[$i] = $item;
+                }
+            }
+            $array = $result;
+        } else {
+            throw new RuntimeError(
+                sprintf(
+                    'First argument of "filter" must be array or Traversable, but is "%s".',
+                    gettype($array)
+                )
+            );
+        }
 
+        return $array;
+    }
+
+    /**
+     * @throws \Twig\Error\RuntimeError
+     */
+    public static function uniqueBy($array, $callback)
+    {
+        if (!is_array($array) && !($array instanceof \Traversable)) {
+            throw new RuntimeError(
+                sprintf(
+                    'First argument of "unique_by" must be array or Traversable, but is "%s".',
+                    gettype($array)
+                )
+            );
+        }
+
+        if ('==' === $callback) {
+            $callback = function ($item1, $item2) {
+                return $item1 == $item2;
+            };
+        } else {
+            if ('===' === $callback) {
+                $callback = function ($item1, $item2) {
+                    return $item1 === $item2;
+                };
+            } else {
+                if (!is_callable($callback)) {
+                    throw new RuntimeError(
+                        sprintf(
+                            'Second argument of "unique_by" must be callable, "==" or "===", but is "%s".',
+                            gettype($callback)
+                        )
+                    );
+                }
+            }
+        }
+
+        if ($array instanceof \Traversable) {
+            if ($array instanceof \Iterator) {
+                // convert Iterator to IteratorAggregate for nested foreach
+                $array = Dictionary::fromArray((array)$array);
+            }
+            $result = new Dictionary();
+        } else {
+            $result = [];
+        }
+
+        foreach ($array as $i => $item) {
+            foreach ($array as $j => $previous) {
+                if ($i === $j) {
+                    // add to results if already checked every previous element
+                    $result[$i] = $item;
+                } elseif (isset($result[$j]) && $callback($item, $previous, $i, $j)) {
+                    // skip if is identical with value which is already in results array
+                    continue 2;
+                }
+            }
+        }
+        return $result;
+    }
+
+    /**
+     * @throws \Twig\Error\RuntimeError
+     */
+    public static function groupBy($array, $callback)
+    {
+        if (!is_callable($callback)) {
+            throw new RuntimeError(
+                sprintf(
+                    'Second argument of "group_by" must be callable, but is "%s".',
+                    gettype($callback)
+                )
+            );
+        }
+
+        if (!is_array($array) && !($array instanceof \Traversable)) {
+            throw new RuntimeError(
+                sprintf(
+                    'First argument of "group_by" must be array or Traversable, but is "%s".',
+                    gettype($array)
+                )
+            );
+        }
+
+        $results = new Dictionary();
+
+        foreach ($array as $i => $item) {
+            $key = $callback($item, $i);
+
+            if (!isset($results[$key])) {
+                $results[$key] = [$i => $item];
+            } else {
+                $results[$key][$i] = $item;
+            }
+        }
+
+        return $results;
+    }
+
+    /**
+     * @throws \Twig\Error\RuntimeError
+     */
+    public static function sortBy($array, $callback, $direction = 'ASC')
+    {
+        if (!is_callable($callback)) {
+            throw new RuntimeError(
+                sprintf(
+                    'Second argument of "sort_by" must be callable, but is "%s".',
+                    gettype($callback)
+                )
+            );
+        }
+
+        if (!is_array($array) && !($array instanceof \Traversable)) {
+            throw new RuntimeError(
+                sprintf(
+                    'First argument of "sort_by" must be array or Traversable, but is "%s".',
+                    gettype($array)
+                )
+            );
+        }
+
+        if ($array instanceof \Traversable) {
+            if ($array instanceof Dictionary) {
+                $array = $array->getCopy();
+            } else {
+                $array = Dictionary::fromArray((array)$array);
+            }
+            return $array->sortBy($callback, $direction);
+        } else {
+            $direction = (strtoupper($direction) === 'DESC') ? SORT_DESC : SORT_ASC;
+            $order = self::map($array, $callback);
+            array_multisort($order, $direction, SORT_REGULAR, $array);
+            return $array;
+        }
+    }
+
+    /**
+     * @throws \Twig\Error\RuntimeError
+     */
+    public static function map($array, $callback)
+    {
+        if (!is_callable($callback)) {
+            throw new RuntimeError(
+                sprintf(
+                    'Second argument of "map" must be callable, but is "%s".',
+                    gettype($callback)
+                )
+            );
+        }
+
+        if (is_array($array)) {
+            $array = array_map($callback, $array, array_keys($array));
+        } elseif ($array instanceof \Traversable) {
+            $result = new Dictionary();
+            foreach ($array as $i => $item) {
+                $result[$i] = $callback($item, $i);
+            }
+            $array = $result;
+        } else {
+            throw new RuntimeError(
+                sprintf(
+                    'First argument of "map" must be array or Traversable, but is "%s".',
+                    gettype($array)
+                )
+            );
+        }
+
+        return $array;
+    }
+
+    /**
+     * @throws \Twig\Error\RuntimeError
+     */
+    public static function countBy($array, $callback)
+    {
+        if (!is_callable($callback)) {
+            throw new RuntimeError(
+                sprintf(
+                    'Second argument of "count_by" must be callable, but is "%s".',
+                    gettype($callback)
+                )
+            );
+        }
+
+        if (!is_array($array) && !($array instanceof \Traversable)) {
+            throw new RuntimeError(
+                sprintf(
+                    'First argument of "count_by" must be array or Traversable, but is "%s".',
+                    gettype($array)
+                )
+            );
+        }
+
+        $result = new Dictionary();
+        foreach ($array as $i => $element) {
+            $key = $callback($element, $i);
+            if (is_bool($key)) {
+                $key = $key ? 'true' : 'false';
+            } elseif (is_null($key)) {
+                $key = 'null';
+            }
+            if (!isset($result[$key])) {
+                $result[$key] = 1;
+            } else {
+                ++$result[$key];
+            }
+        }
+        return $result;
+    }
+
+    public static function every($array, $callback)
+    {
+        if (!is_callable($callback)) {
+            throw new RuntimeError(
+                sprintf(
+                    'Second argument of "every" must be callable, but is "%s".',
+                    gettype($callback)
+                )
+            );
+        }
+
+        if (!is_array($array) && !($array instanceof \Traversable)) {
+            throw new RuntimeError(
+                sprintf(
+                    'First argument of "every" must be array or Traversable, but is "%s".',
+                    gettype($array)
+                )
+            );
+        }
+
+        foreach ($array as $i => $item) {
+            if (!$callback($item, $i)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public static function any($array, $callback)
+    {
+        if (!is_callable($callback)) {
+            throw new RuntimeError(
+                sprintf(
+                    'Second argument of "any" must be callable, but is "%s".',
+                    gettype($callback)
+                )
+            );
+        }
+
+        if (!is_array($array) && !($array instanceof \Traversable)) {
+            throw new RuntimeError(
+                sprintf(
+                    'First argument of "any" must be array or Traversable, but is "%s".',
+                    gettype($array)
+                )
+            );
+        }
+
+        foreach ($array as $i => $item) {
+            if ($callback($item, $i)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static function call($callback, array $args = [])
+    {
+        if (!is_callable($callback)) {
+            throw new \InvalidArgumentException('First argument must be callable.');
+        }
+        return call_user_func_array($callback, $args);
+    }
 
     public function getOperators(): array
     {
         return [
             [
-                '==>' => [
+                '=>' => [
                     'precedence' => 0,
-                    'class' => SimpleLambda::class,
+                    'class' => SimpleLambda::class
                 ],
             ],
             [
-                '==>' => [
+                '=>' => [
                     'precedence' => 0,
                     'class' => LambdaWithArguments::class,
-                    'associativity' => ExpressionParser::OPERATOR_LEFT,
+                    'associativity' => ExpressionParser::OPERATOR_LEFT
                 ],
                 ';' => [
                     'precedence' => 5,
                     'class' => Arguments::class,
-                    'associativity' => ExpressionParser::OPERATOR_RIGHT,
+                    'associativity' => ExpressionParser::OPERATOR_RIGHT
                 ],
-            ],
+            ]
         ];
     }
 
@@ -103,247 +388,6 @@ class LambdaExtension extends AbstractExtension
             new TwigFilter('sort_by', '\DPolac\TwigLambda\LambdaExtension::sortBy'),
             new TwigFilter('count_by', '\DPolac\TwigLambda\LambdaExtension::countBy'),
         ];
-    }
-
-    /**
-     * @throws \Twig\Error\RuntimeError
-     */
-    public static function map($array, $callback)
-    {
-        if (!is_callable($callback)) {
-            throw new RuntimeError(sprintf(
-                'Second argument of "map" must be callable, but is "%s".', gettype($callback)));
-        }
-
-        if (is_array($array)) {
-            $array = array_map($callback, $array, array_keys($array));
-        } elseif ($array instanceof \Traversable) {
-            $result = new Dictionary();
-            foreach ($array as $i => $item) {
-                $result[$i] = $callback($item, $i);
-            }
-            $array = $result;
-        } else {
-            throw new RuntimeError(sprintf(
-                'First argument of "map" must be array or Traversable, but is "%s".', gettype($array)));
-        }
-
-        return $array;
-    }
-
-    /**
-     * @throws \Twig\Error\RuntimeError
-     */
-    public static function filter($array, $callback)
-    {
-        if (!is_callable($callback)) {
-            throw new RuntimeError(sprintf(
-                'Second argument of "filter" must be callable, but is "%s".', gettype($callback)));
-        }
-
-        if (is_array($array)) {
-            $array = array_filter($array, $callback, ARRAY_FILTER_USE_BOTH);
-        } elseif ($array instanceof \Traversable) {
-            $result = new Dictionary();
-            foreach ($array as $i => $item) {
-                if ($callback($item, $i)) {
-                    $result[$i] = $item;
-                }
-            }
-            $array = $result;
-        } else {
-            throw new RuntimeError(sprintf(
-                'First argument of "filter" must be array or Traversable, but is "%s".', gettype($array)));
-        }
-
-        return $array;
-    }
-
-    /**
-     * @throws \Twig\Error\RuntimeError
-     */
-    public static function uniqueBy($array, $callback)
-    {
-        if (!is_array($array) && !($array instanceof \Traversable)) {
-            throw new RuntimeError(sprintf(
-                'First argument of "unique_by" must be array or Traversable, but is "%s".', gettype($array)));
-        }
-
-        if ('==' === $callback) {
-            $callback = function($item1, $item2) { return $item1 == $item2; };
-        } else if ('===' === $callback) {
-            $callback = function($item1, $item2) { return $item1 === $item2; };
-        } else if (!is_callable($callback)) {
-            throw new RuntimeError(sprintf(
-                'Second argument of "unique_by" must be callable, "==" or "===", but is "%s".', gettype($callback)));
-        }
-
-        if ($array instanceof \Traversable) {
-            if ($array instanceof \Iterator) {
-                // convert Iterator to IteratorAggregate for nested foreach
-                $array = Dictionary::fromArray((array) $array);
-            }
-            $result = new Dictionary();
-        } else {
-            $result = [];
-        }
-
-        foreach ($array as $i => $item) {
-            foreach ($array as $j => $previous) {
-                if ($i === $j) {
-                    // add to results if already checked every previous element
-                    $result[$i] = $item;
-                } elseif (isset($result[$j]) && $callback($item, $previous, $i, $j)) {
-                    // skip if is identical with value which is already in results array
-                    continue 2;
-                }
-            }
-        }
-        return $result;
-    }
-
-    /**
-     * @throws \Twig\Error\RuntimeError
-     */
-    public static function groupBy($array, $callback)
-    {
-
-        if (!is_callable($callback)) {
-            throw new RuntimeError(sprintf(
-                'Second argument of "group_by" must be callable, but is "%s".', gettype($callback)));
-        }
-
-        if (!is_array($array) && !($array instanceof \Traversable)) {
-            throw new RuntimeError(sprintf(
-                'First argument of "group_by" must be array or Traversable, but is "%s".', gettype($array)));
-        }
-
-        $results = new Dictionary();
-
-        foreach ($array as $i => $item) {
-            $key = $callback($item, $i);
-
-            if (!isset($results[$key])) {
-                $results[$key] = [$i => $item];
-            } else {
-                $results[$key][$i] = $item;
-            }
-
-        }
-
-        return $results;
-    }
-
-    /**
-     * @throws \Twig\Error\RuntimeError
-     */
-    public static function sortBy($array, $callback, $direction = 'ASC')
-    {
-        if (!is_callable($callback)) {
-            throw new RuntimeError(sprintf(
-                'Second argument of "sort_by" must be callable, but is "%s".', gettype($callback)));
-        }
-
-        if (!is_array($array) && !($array instanceof \Traversable)) {
-            throw new RuntimeError(sprintf(
-                'First argument of "sort_by" must be array or Traversable, but is "%s".', gettype($array)));
-        }
-
-        if ($array instanceof \Traversable) {
-            if ($array instanceof Dictionary) {
-                $array = $array->getCopy();
-            } else {
-                $array = Dictionary::fromArray((array) $array);
-            }
-            return $array->sortBy($callback, $direction);
-        } else {
-            $direction = (strtoupper($direction) === 'DESC') ? SORT_DESC : SORT_ASC;
-            $order = self::map($array, $callback);
-            array_multisort($order, $direction, SORT_REGULAR, $array);
-            return $array;
-        }
-    }
-
-    /**
-     * @throws \Twig\Error\RuntimeError
-     */
-    public static function countBy($array, $callback)
-    {
-        if (!is_callable($callback)) {
-            throw new RuntimeError(sprintf(
-                'Second argument of "count_by" must be callable, but is "%s".', gettype($callback)));
-        }
-
-        if (!is_array($array) && !($array instanceof \Traversable)) {
-            throw new RuntimeError(sprintf(
-                'First argument of "count_by" must be array or Traversable, but is "%s".', gettype($array)));
-        }
-
-        $result = new Dictionary();
-        foreach ($array as $i => $element) {
-            $key = $callback($element, $i);
-            if (is_bool($key)) {
-                $key = $key ? 'true' : 'false';
-            } elseif (is_null($key)) {
-                $key = 'null';
-            }
-            if (!isset($result[$key])) {
-                $result[$key] = 1;
-            } else {
-                ++$result[$key];
-            }
-        }
-        return $result;
-    }
-
-    public static function every($array, $callback)
-    {
-        if (!is_callable($callback)) {
-            throw new RuntimeError(sprintf(
-                'Second argument of "every" must be callable, but is "%s".', gettype($callback)));
-        }
-
-        if (!is_array($array) && !($array instanceof \Traversable)) {
-            throw new RuntimeError(sprintf(
-                'First argument of "every" must be array or Traversable, but is "%s".', gettype($array)));
-        }
-
-        foreach ($array as $i => $item) {
-            if (!$callback($item, $i)) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    public static function any($array, $callback)
-    {
-        if (!is_callable($callback)) {
-            throw new RuntimeError(sprintf(
-                'Second argument of "any" must be callable, but is "%s".', gettype($callback)));
-        }
-
-        if (!is_array($array) && !($array instanceof \Traversable)) {
-            throw new RuntimeError(sprintf(
-                'First argument of "any" must be array or Traversable, but is "%s".', gettype($array)));
-        }
-
-        foreach ($array as $i => $item) {
-            if ($callback($item, $i)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    public static function call($callback, array $args = [])
-    {
-        if (!is_callable($callback)) {
-            throw new \InvalidArgumentException('First argument must be callable.');
-        }
-        return call_user_func_array($callback, $args);
     }
 
     public function getName()
